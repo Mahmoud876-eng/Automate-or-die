@@ -139,31 +139,160 @@ class InsuranceFileMemory(BaseModel):
 insurance_memory_structured_llm = gllm.with_structured_output(
     InsuranceFileMemory
 )
-@tool #TODO: a loop to check the missing data
-def fillfile(runtime: ToolRuntime[Context]):
+import json
+from fastapi.encoders import jsonable_encoder
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.tools import tool
+
+
+INSURANCE_FILE_EXTRACTION_PROMPT = """
+You are an insurance claim file extraction assistant.
+
+Extract structured insurance claim information from the user's latest message.
+
+Rules:
+- Extract only information explicitly provided or clearly implied.
+- Never invent missing data.
+- If a field is missing, keep it null or empty.
+- Add important missing fields to missing_information.
+- Use claim_status="draft" for a new incomplete claim unless another status is provided.
+- Use claim_priority only when enough information exists.
+- Output must match the InsuranceFileMemory schema exactly.
+
+Important missing fields:
+- claimant name
+- policy number
+- insurance type
+- incident type
+- incident date
+- incident location
+- incident description
+- damages or losses
+- injuries if any
+- supporting documents
+"""
+
+
+insurance_memory_structured_llm = gllm.with_structured_output(
+    InsuranceFileMemory
+)
+
+
+@tool
+def store_insurance_file(runtime: ToolRuntime[Context]) -> ToolMessage:
     """
-    when an agent want to  generate a document here it s 
+    STORE OR UPDATE INSURANCE CLAIM DATA.
+
+    Call this tool when the user provides insurance claim information, such as:
+    - claimant name
+    - policy number
+    - insurance type
+    - accident details
+    - theft, fire, flood, injury, or damage details
+    - vehicle information
+    - damages or losses
+    - injuries
+    - documents provided
+    - missing claim information
+
+    This tool extracts the insurance claim data from the latest user message
+    and saves it in the user's insurance file memory.
+
+    Important:
+    - Use this tool for insurance claim data only.
+    - Do not use store_memory for insurance claim data.
+    - Never invent missing claim details.
+    - If information is missing, save it inside missing_information.
     """
+
     messages = runtime.state.get("messages", [])
-    user_id=runtime.context.user_id
-    namespace=(user_id,"memories")
+    user_id = runtime.context.user_id
+    namespace = (user_id, "insurance_files")
+
+    human_message = None
+
     for m in reversed(messages):
         if isinstance(m, HumanMessage):
             human_message = m
             break
-    
+
+    if human_message is None:
+        return ToolMessage(
+            content=json.dumps({
+                "status": "error",
+                "message": "No user message found to extract insurance data from."
+            }, ensure_ascii=False),
+            tool_call_id=runtime.tool_call_id
+        )
+
     clean_messages = [
-        SystemMessage(content="Extract user preferences from this message."),
+        SystemMessage(content=INSURANCE_FILE_EXTRACTION_PROMPT),
         HumanMessage(content=human_message.content)
     ]
 
-    
-    response = insurance_memory_structured_llm.invoke(clean_messages)
-     
-    runtime.store.put( 
+    extracted_file = insurance_memory_structured_llm.invoke(clean_messages)
+
+    insurance_data = jsonable_encoder(extracted_file)
+
+    runtime.store.put(
         namespace,
-        "a-memory",
-        jsonable_encoder(response),
+        "current_insurance_file",
+        insurance_data
+    )
+
+    return ToolMessage(
+        content=json.dumps({
+            "status": "saved",
+            "message": "Insurance claim file saved successfully.",
+            "insurance_file": insurance_data,
+            "missing_information": insurance_data.get("missing_information", []),
+            "next_actions": insurance_data.get("next_actions", [])
+        }, ensure_ascii=False),
+        tool_call_id=runtime.tool_call_id
+    )
+@tool
+def retrieve_insurance_file(runtime: ToolRuntime[Context]) -> ToolMessage:
+    """
+    Retrieve the current insurance claim file.
+
+    Call this tool when:
+    - The user asks about their insurance claim.
+    - The user asks what information has already been collected.
+    - The user asks what data is still missing.
+    - The user asks for a summary of their claim.
+    - The user wants to continue a previously started claim.
+    - Before asking the user for claim details, if an active claim may already exist.
+
+    Returns:
+    - Full insurance file data.
+    - Missing information.
+    - Current status.
+    - Recommended next actions.
+    """
+
+    user_id = runtime.context.user_id
+    namespace = (user_id, "insurance_files")
+
+    insurance_file = runtime.store.get(
+        namespace,
+        "current_insurance_file"
+    )
+
+    if insurance_file is None:
+        return ToolMessage(
+            content=json.dumps({
+                "status": "not_found",
+                "message": "No insurance claim file found."
+            }),
+            tool_call_id=runtime.tool_call_id
+        )
+
+    return ToolMessage(
+        content=json.dumps({
+            "status": "found",
+            "insurance_file": insurance_file
+        }, ensure_ascii=False),
+        tool_call_id=runtime.tool_call_id
     )
 @tool
 async def redirect_to_recomendation( runtime: ToolRuntime[Context]) -> Command:
@@ -263,60 +392,19 @@ def retrieve_memory(runtime: ToolRuntime[Context]) -> ToolMessage:
 
 #subscription automatique 
 #cimiste 
-
-sys_prompt="""
-You are a helpful, friendly conversational assistant with long-term memory.
-
-You have access to two tools:
-1. store_memory(content: str, category: str) — Save an important fact, 
-   preference, or detail about the user for future conversations.
-2. retrieve_memory(query: str) — Search your stored memories for relevant 
-   past information about the user.
-
-## When to use store_memory
-Use this whenever the user shares something worth remembering long-term:
-- Personal facts (name, job, location, family members)
-- Preferences (likes/dislikes, communication style, goals)
-- Ongoing projects or ongoing situations they mention
-- Anything they explicitly ask you to remember
-
-Do NOT store: small talk, one-off questions, or anything the user says not 
-to remember.
-
-## When to use retrieve_memory
-Use this:
-- At the start of a new conversation topic, to check if you already know 
-  something relevant about the user
-- When the user references something from "before" ("like I told you", 
-  "remember when...", "as usual")
-- Before answering personal questions about the user (e.g. "what's my job again?")
-
-## Behavior rules
-- Never fabricate a memory. If retrieve_memory returns nothing relevant, 
-  say you don't have that on record yet — don't guess.
-- Be transparent but not robotic: don't say "I am calling store_memory now" 
-  — just naturally acknowledge what you're noting, e.g. "Got it, I'll 
-  remember that."
-- Keep stored memories short, factual, and in third person 
-  (e.g. "User works as a backend developer in Tunis" not "I work as...").
-- Always retrieve before you assume — don't rely only on the current 
-  conversation's context if the user references the past.
-- Stay conversational and natural. The memory system should feel invisible 
-  to the user, not like a database lookup.
-
-"""
 main_tools=[
                 retrieve_memory,
                 store_memory,
                 redirect_to_recomendation,
-                fillfile
+                store_insurance_file,
+                retrieve_insurance_file
                 ]
 
 tool_long_term=[
                 retrieve_memory,
                 store_memory,
                 ]
-run_agent = create_agent(gllm,system_prompt=SystemMessage(content=sys_prompt), context_schema= Context , tools=tool_long_term, checkpointer=checkpointer, store=store)
+run_agent = create_agent(gllm,system_prompt=SystemMessage(content=INSURANCE_FILE_EXTRACTION_PROMPT), context_schema= Context , tools=main_tools, checkpointer=checkpointer, store=store)
 @app.post('/chatbot/')#we are gonna ue langraph later here
 async def chatbot(user_input: str, thr_id:str, usr_id: str):
     
@@ -1253,6 +1341,7 @@ from typing import Optional, List, Dict, Any
 class Context(BaseModel):
     user_id: Optional[str] = None
     session_id: Optional[str] = None
+    
 
     messages: List[Any] = Field(default_factory=list)
 
@@ -1325,10 +1414,10 @@ intent_llm = gllm.with_structured_output(IntentOutput)
 
 # ✅ ✅ FINAL NODE (FIXED)
 def intent_node(state: Context):
-    thread_id = get_thread_id(state.session_id, 1)
+    
 
     result = intent_llm.invoke(
-        {"messages": state.messages},
+        { [HumanMessage(content=state.messages)]},
        
     )
 
@@ -1606,8 +1695,7 @@ agent_graph.add_node("clarification", clarification_node, retry_policy=RetryPoli
 # FLOW
 # ------------------------
 
-agent_graph.add_edge(START, "orchestrator")
-agent_graph.add_edge("orchestrator", "intent")
+agent_graph.add_edge(START, "intent")
 
 
 agent_graph.add_conditional_edges("intent", conditional_edge)
@@ -1629,7 +1717,11 @@ agent_graph.add_edge("clarification", "intent")
 agent_graph.add_edge("response", END)
 
 
+
 insurance_chain = agent_graph.compile()
+graph_png = insurance_chain.get_graph().draw_mermaid_png()
+with open("./langGraph/insurance_workflow.png", "wb") as f:
+    f.write(graph_png)
 from langchain_core.messages import HumanMessage
 
 @app.post('/multiagents/')
