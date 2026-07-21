@@ -190,7 +190,7 @@ Your job:
 - Do NOT make policy, risk, or customer decisions.
 - If product info is missing, say exactly what is missing.
 """,
-    "tools": [search_products],
+    "tools": [],
 }
 
 customer_specialist = {
@@ -210,7 +210,7 @@ Your job:
 - Do NOT make product or risk decisions.
 - If the customer name is missing, say that it is missing.
 """,
-    "tools": [lookup_customer],
+    "tools": [],
 }
 
 document_specialist = {
@@ -229,7 +229,7 @@ Your job:
 - Do NOT answer the user directly.
 - Do NOT make final recommendations.
 """,
-    "tools": [search_documents],
+    "tools": [],
 }
 
 risk_specialist = {
@@ -248,7 +248,7 @@ Your job:
 - Do NOT answer the user directly.
 - Be practical and concise for a hackathon demo.
 """,
-    "tools": [run_risk_check],
+    "tools": [],
 }
 
 answer_synthesizer = {
@@ -334,7 +334,7 @@ llm = AzureAIOpenAIApiChatModel(
 
 from langchain_openai import AzureChatOpenAI
 from langchain_openai import ChatOpenAI
-lvlm= ChatOpenAI(
+llfm= ChatOpenAI(
     base_url=api,
     api_key=key,
     model= "gpt-4.1"
@@ -636,12 +636,10 @@ def retrieve_insurance_file(runtime: ToolRuntime[Context]) -> ToolMessage:
             }),
             tool_call_id=runtime.tool_call_id
         )
+    
 
     return ToolMessage(
-        content=json.dumps({
-            "status": "found",
-            "insurance_file": insurance_file
-        }, ensure_ascii=False),
+        content= json.dumps(insurance_file, ensure_ascii=False),
         tool_call_id=runtime.tool_call_id
     )
 @tool
@@ -802,14 +800,107 @@ async def chatbot(user_input: str, thr_id:str, usr_id: str):
     )
     return response
 
-@app.post('/recomendation/')
-async def recomendation_system(message: str, thr_id:str, usr_id: str):
-    response= run_agent.invoke(
-        {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": thr_id}},
-        context=Context(user_id=usr_id),
+
+
+class InsuranceRecommendationRequest(BaseModel):
+    customer_age: Optional[int] = Field(
+        default=None,
+        description="Customer age in years. Extract only when explicitly mentioned by the customer."
     )
-    return response
+
+    marital_status: Optional[str] = Field(
+        default=None,
+        description="Customer marital status such as single, married, divorced, widowed, or engaged."
+    )
+
+    employment_status: Optional[str] = Field(
+        default=None,
+        description="Customer employment situation such as employed, self-employed, unemployed, retired, student, or business owner."
+    )
+
+    income_level: Optional[str] = Field(
+        default=None,
+        description="Customer income category inferred from the message. Examples: low, medium, high, very_high."
+    )
+
+    dependents: Optional[int] = Field(
+        default=None,
+        description="Number of people financially dependent on the customer, such as children, spouse, or elderly parents."
+    )
+
+    vehicle_owner: bool = Field(
+        default=False,
+        description="True if the customer owns, leases, or regularly drives a vehicle. Otherwise false."
+    )
+
+    homeowner: bool = Field(
+        default=False,
+        description="True if the customer owns a home, apartment, property, or real estate asset. Otherwise false."
+    )
+
+    insurance_needs: list[str] = Field(
+        description="""
+        List of insurance products that match the customer's profile and expressed needs.
+        Examples:
+        - health_insurance
+        - life_insurance
+        - auto_insurance
+        - home_insurance
+        - travel_insurance
+        - disability_insurance
+        - business_insurance
+        """
+    )
+
+    risk_profile: str = Field(
+        description="""
+        Overall insurance risk profile of the customer.
+        Examples:
+        - low_risk
+        - moderate_risk
+        - high_risk
+        - family_protection
+        - asset_protection
+        - retirement_planning
+        - business_protection
+        """
+    )
+
+    recommendation_reason: str = Field(
+        description="""
+        Detailed explanation of why the insurance recommendations were selected,
+        based on customer demographics, financial situation, assets,
+        family status, and stated insurance goals.
+        """
+    )
+
+structured_llm = llm.with_structured_output(
+    InsuranceRecommendationRequest
+)
+
+
+@app.post("/recommendation/")
+async def recommendation_system(message: str):
+
+    result = structured_llm.invoke([
+        (
+            "system",
+            """
+            You are an insurance recommendation engine.
+
+            Analyze the customer message and extract:
+            - demographic information if mentioned
+            - insurance needs
+            - customer risk profile
+            - recommendation reason
+
+            Return only the structured schema.
+            """
+        ),
+        ("human", message)
+    ])
+
+    return result.model_dump()
 @app.post('/generate_insurance_document/')
 def generate_insurance_document ( usr_id: str):
    

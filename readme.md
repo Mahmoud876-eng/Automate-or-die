@@ -1,696 +1,855 @@
-# AI Insurance Assistant with LangGraph, FastAPI, Long-Term Memory & Multi-Agent Architecture
+=# README.md
 
-## 📌 Overview
+# Multi-Agent Company Assistant & Insurance Memory Platform
+## run the code 
+fastapi dev deep.py
+## Overview
 
-This project is a **production-ready AI Insurance Assistant** built using:
+This project is a **LangGraph + DeepAgents + FastAPI** application that demonstrates two different AI-powered systems:
 
-* **LangGraph**
-* **LangChain Agents**
-* **Google Gemma Models**
-* **Azure AI Foundry Models**
-* **FastAPI**
-* **Structured Outputs (Pydantic)**
-* **Long-Term Memory**
-* **Multi-Agent Orchestration**
-* **Insurance Workflow Automation**
+1. **Multi-Agent Company Assistant**
+   * Uses multiple specialized AI agents coordinated by a supervisor.
+   * Helps with products, customers, policies, documents, and risk analysis.
+   * Demonstrates delegation, routing, and answer synthesis.
 
-The system combines conversational AI, persistent memory, insurance file extraction, recommendation engines, workflow orchestration, and specialized agents into a single architecture.
+2. **Insurance Memory Assistant**
+   * Collects, stores, retrieves, and manages insurance claim information.
+   * Maintains long-term memory per user.
+   * Extracts structured insurance files automatically using Pydantic schemas.
+   * Can later generate insurance recommendation documents.
+
+This project was built as a **hackathon prototype** to demonstrate:
+
+* Multi-agent orchestration
+* Tool calling
+* Long-term memory
+* Structured extraction
+* FastAPI APIs
+* LangGraph persistence
 
 ***
 
 # Architecture
 
-```text
-                         User
-                           │
-                           ▼
-                    FastAPI Endpoint
-                           │
-                           ▼
-                    LangGraph Router
-                           │
-        ┌──────────────────┴──────────────────┐
-        │                                     │
-        ▼                                     ▼
- Simple Memory Agent              Multi-Agent Workflow
-        │                                     │
-        │                                     ▼
-        │                           Orchestrator Agent
-        │                                     │
-        │                                     ▼
-        │                              Intent Agent
-        │                                     │
-        │                     ┌───────────────┴──────────────┐
-        │                     │                              │
-        ▼                     ▼                              ▼
- Long-Term Memory      Product Agent                Customer Agent
-        │                     │                              │
-        │                     ▼                              ▼
-        │              Recommendation Agent       Subscription Agent
-        │
-        ▼
- Insurance File
- Extraction Tool
+```
+                    +----------------+
+                    |     User       |
+                    +-------+--------+
+                            |
+                            v
+                  +------------------+
+                  |     FastAPI      |
+                  +------------------+
+                            |
+          --------------------------------------
+          |                                    |
+          v                                    v
 
++-----------------------+     +------------------------+
+| Multi-Agent Assistant |     | Insurance Assistant    |
++-----------------------+     +------------------------+
+
+            |                            |
+            v                            v
+
++------------------+        +------------------------+
+| Supervisor Agent |        | Long Term Memory Agent |
++------------------+        +------------------------+
+
+            |
+            v
+
+   +-------------------+
+   | Specialist Agents |
+   +-------------------+
+
+      Product Agent
+      Customer Agent
+      Document Agent
+      Risk Agent
+      Answer Agent
 ```
 
 ***
 
-# Features
+# Main Technologies
 
-## ✅ Conversational AI
+### AI Frameworks
 
-The assistant can:
-
-* Answer insurance questions
-* Guide customers
-* Explain policies
-* Help in product selection
-* Handle subscription workflows
-
-***
-
-## ✅ Long-Term User Memory
-
-The system stores user information across sessions.
-
-Examples:
-
-```text
-"My name is Mahmoud"
-
-"I prefer life insurance"
-
-"I learn through examples"
-```
-
-Stored memory:
-
-```json
-{
-  "user_name": "Mahmoud"
-}
-```
-
-Uses:
-
-* Personalization
-* Recommendations
-* Profile recall
-* Workflow continuity
-
-***
-
-## ✅ Insurance File Extraction
-
-The system can automatically transform user conversations into structured insurance claims.
-
-Example:
-
-```text
-I had a car accident yesterday in Tunis.
-My car is a 2023 Toyota Corolla.
-```
-
-Output:
-
-```json
-{
-  "insurance_type": "auto",
-  "incident_type": "accident",
-  "incident_location": "Tunis",
-  "vehicle_information": "2023 Toyota Corolla"
-}
-```
-
-***
-
-## ✅ Structured Outputs Everywhere
-
-Every agent produces predictable JSON outputs using Pydantic.
-
-Benefits:
-
-* Reliable orchestration
-* Strong validation
-* Easy frontend integration
-* Tool interoperability
-
-***
-
-## Technology Stack
-
-### Backend
-
-* FastAPI
 * LangGraph
 * LangChain
+* DeepAgents
 
 ### Models
 
-#### Azure AI Foundry
+* GPT-4.1 (Azure OpenAI)
+* Mistral Large 3 (Azure AI Inference)
 
-```python
-AzureAIOpenAIApiChatModel(
-    model="Mistral-Large-3"
-)
-```
+### APIs
 
-Used for:
+* FastAPI
 
-* Reasoning
-* Insurance workflows
-* Production inference
+### Memory
 
-***
+* InMemoryStore
+* InMemorySaver
 
-#### Google Gemini / Gemma
+### Validation
 
-```python
-ChatGoogleGenerativeAI(
-    model="gemma-4-26b-a4b-it"
-)
-```
-
-Used for:
-
-* Structured extraction
-* Memory generation
-* Agent execution
+* Pydantic
 
 ***
 
-### Persistence
+# Part 1: Multi-Agent Company Assistant
 
-#### Short-Term Memory
+***
+
+## Purpose
+
+The company assistant simulates an internal AI team.
+
+Instead of one AI answering everything, tasks are delegated to specialists.
+
+Example request:
+
+> ACME wants 20 laptops and a 15% discount. Is this allowed?
+
+The system may:
+
+1. Check products.
+2. Check customer profile.
+3. Check company policies.
+4. Run risk analysis.
+5. Generate a final recommendation.
+
+***
+
+# Available Demo Data
+
+***
+
+## Products
+
+### Laptop Pro 14
+
+* Price: $1299
+* Stock: 18
+* Best for:
+  * Developers
+  * Analysts
+  * Business users
+
+***
+
+### Tablet Air
+
+* Price: $599
+* Stock: 42
+* Best for:
+  * Sales teams
+  * Field workers
+
+***
+
+### Secure Router X
+
+* Price: $249
+* Stock: 7
+* Best for:
+  * Small offices
+  * Security-focused teams
+
+***
+
+## Customers
+
+### ACME Corp
+
+* Enterprise customer
+* Active contract
+* Security review required for purchases above $1000
+
+### StartupX
+
+* Startup customer
+* Trial account
+* Limited commitment approval
+
+***
+
+## Internal Documents
+
+The demo contains policies including:
+
+* Return policy
+* Discount policy
+* Security policy
+* Shipping policy
+
+***
+
+# Specialist Agents
+
+***
+
+## Product Specialist
+
+Responsible for:
+
+* Product recommendations
+* Pricing
+* Availability
+* Stock checking
+
+Uses:
 
 ```python
-MemorySaver()
+search_products()
 ```
 
-Stores conversation history by:
+***
+
+## Customer Specialist
+
+Responsible for:
+
+* Customer lookup
+* Customer status
+* Region
+* Contracts
+
+Uses:
+
+```python
+lookup_customer()
+```
+
+***
+
+## Document Specialist
+
+Responsible for:
+
+* Internal policies
+* Shipping rules
+* Return policies
+* Discount rules
+
+Uses:
+
+```python
+search_documents()
+```
+
+***
+
+## Risk Specialist
+
+Responsible for:
+
+* Compliance review
+* Approval requirements
+* Security checks
+* Risk flags
+
+Uses:
+
+```python
+run_risk_check()
+```
+
+***
+
+## Answer Synthesizer
+
+Responsible for:
+
+* Combining all specialist outputs
+* Producing the final user response
+
+***
+
+# Supervisor Agent
+
+The supervisor is the brain of the system.
+
+Prompt:
 
 ```text
-thread_id
+SUPERVISOR_PROMPT
 ```
+
+Responsibilities:
+
+### 1. Understand Request
+
+Classify:
+
+* Product question
+* Customer question
+* Policy question
+* Risk request
+* Decision support
 
 ***
 
-#### Long-Term Memory
+### 2. Ask Clarifying Questions
 
-```python
-InMemoryStore()
-```
-
-Stores:
-
-```text
-user_id
-```
-
-namespaced memories.
+If information is missing:
 
 Example:
 
+> Recommend a laptop
+
+Supervisor asks:
+
+> What will the laptop be used for?
+
+***
+
+### 3. Route Work
+
+Delegates to relevant specialists.
+
+***
+
+### 4. Gather Results
+
+Collects internal notes.
+
+***
+
+### 5. Generate Final Answer
+
+Calls:
+
 ```python
-(user_id, "memories")
+answer_synthesizer
 ```
 
 ***
 
-# Available Tools
+# Multi-Agent Endpoint
 
-***
+### POST
 
-## store\_memory
+```http
+/multiagents/
+```
 
-Stores important user information.
-
-Example:
+### Parameters
 
 ```text
-"My name is Sarah"
+user_input
+thr_id
+usr_id
 ```
 
-Triggers:
+### Example
 
-```python
-store_memory()
-```
+```http
+POST /multiagents/
 
-Output:
-
-```json
-{
-  "user_name": "Sarah"
-}
-```
-
-***
-
-## retrieve\_memory
-
-Searches saved user memory.
-
-Example:
-
-```text
-"What's my name?"
-```
-
-Returns:
-
-```json
-{
-  "user_name": "Sarah"
-}
+user_input="ACME wants laptops with a discount"
+thr_id="thread_123"
+usr_id="user_456"
 ```
 
 ***
 
-## fillfile
-
-Creates structured insurance claim files.
-
-Extracted fields include:
-
-* Claimant Name
-* Policy Number
-* Insurance Type
-* Incident Type
-* Date
-* Location
-* Damage Reports
-* Injuries
-* Documents
-* Missing Information
-* Next Actions
+# Part 2: Insurance Assistant
 
 ***
 
-## redirect\_to\_recomendation
+## Purpose
 
-Routes users to recommendation workflows.
+The insurance assistant acts as an AI insurance advisor capable of:
 
-Used when:
-
-```text
-Generate recommendations
-Suggest policies
-Find matching insurance plans
-```
+* Collecting claim information
+* Storing files
+* Updating files
+* Retrieving files
+* Persisting memory
+* Generating insurance documents
 
 ***
 
-# Insurance Memory Schema
+# Insurance Claim Schema
 
-The claim extraction engine produces:
+The project uses a structured model:
 
 ```python
 InsuranceFileMemory
 ```
 
-Fields:
+Fields include:
 
-| Field               | Description                |
-| ------------------- | -------------------------- |
-| claimant\_name      | Claimant                   |
-| policy\_number      | Policy number              |
-| insurance\_type     | Insurance category         |
-| incident\_type      | Accident, theft, fire, etc |
-| incident\_date      | Incident date              |
-| incident\_location  | Incident location          |
-| damages             | Damages list               |
-| injuries            | Injuries list              |
-| documents\_provided | Submitted documents        |
-| claim\_status       | Current state              |
-| claim\_priority     | Priority level             |
-| next\_actions       | Recommended actions        |
+### Personal Information
+
+* claimant\_name
+* policy\_number
+
+### Insurance Details
+
+* insurance\_type
+
+Examples:
+
+* Auto
+* Health
+* Home
+* Life
+* Travel
+
+### Incident Information
+
+* incident\_type
+* incident\_date
+* incident\_location
+* incident\_description
+
+### Damage Information
+
+* damages
+* injuries
+
+### Supporting Information
+
+* documents\_provided
+
+### Workflow Information
+
+* claim\_status
+* claim\_priority
+* next\_actions
+* missing\_information
 
 ***
 
-# Agent Architecture
+# Automatic Claim Extraction
 
-The platform uses specialized agents.
-
-***
-
-## 1. Orchestrator Agent
-
-Responsible for:
-
-* Workflow routing
-* Agent selection
-* State management
-
-Never answers the user directly.
-
-***
-
-## 2. Intent Agent
-
-Detects:
+When users provide information such as:
 
 ```text
-product_discovery
-product_comparison
-subscription
-policy_review
-risk_analysis
-document_help
-faq
+I had a car accident yesterday.
+My name is John Doe.
+My policy number is 12345.
+The accident happened in Tunis.
 ```
 
-Returns:
+The system automatically extracts:
 
 ```json
 {
-  "intent": "subscription",
-  "confidence": 0.95
+  "claimant_name": "John Doe",
+  "policy_number": "12345",
+  "insurance_type": "auto",
+  "incident_type": "accident"
 }
 ```
 
 ***
 
-## 3. Product Agent
+# Insurance Tools
 
-Handles:
+***
 
-* Product search
-* Product filtering
-* Product comparison
+## Store Insurance File
+
+Tool:
+
+```python
+store_insurance_file()
+```
+
+Purpose:
+
+* Extract claim information
+* Create file
+* Update file
+* Save long-term insurance data
+
+Stored Under:
+
+```python
+(user_id, "insurance_files")
+```
+
+Key:
+
+```python
+current_insurance_file
+```
+
+***
+
+## Retrieve Insurance File
+
+Tool:
+
+```python
+retrieve_insurance_file()
+```
+
+Purpose:
+
+* Resume a claim
+* Check missing information
+* View collected information
 
 Returns:
 
 ```json
 {
-  "products_found": [...]
+  "status": "found",
+  "insurance_file": {}
 }
 ```
 
 ***
 
-## 4. Customer Agent
+# Long-Term User Memory
 
-Retrieves:
+***
 
+## Memory Schema
+
+```python
+LongTermMemory
+```
+
+Stores:
+
+* User name
+* Preferences
 * Profile information
-* Missing user data
-* Customer completeness
 
 ***
 
-## 5. Recommendation Agent
+## Store Memory
 
-Generates:
+Tool:
+
+```python
+store_memory()
+```
+
+Examples:
+
+```text
+My name is Mahmoud.
+```
+
+or
+
+```text
+I like science and technology.
+```
+
+***
+
+## Retrieve Memory
+
+Tool:
+
+```python
+retrieve_memory()
+```
+
+Returns stored user profile information.
+
+***
+
+# Recommendation Redirect Tool
+
+Tool:
+
+```python
+redirect_to_recomendation()
+```
+
+Purpose:
+
+Redirects workflow toward recommendation generation.
+
+Returns:
 
 ```json
 {
-  "recommended_products": [...]
+  "action":"redirect",
+  "target":"/recomendation/"
 }
 ```
 
-Based on:
+***
+
+# Insurance Document Generation
+
+Tool:
+
+```python
+generate_insurance_document()
+```
+
+Purpose:
+
+Generate a customer-facing insurance report.
+
+The final document may include:
 
 * Customer profile
-* Product catalog
-* Risk profile
+* Insurance needs
+* Risk summary
+* Coverage recommendation
+* Premium estimates
+* Advisor recommendations
+
+Current implementation:
+
+* Redirects to document endpoint
+* Retrieves stored memory
+* Returns available user data
 
 ***
 
-## 6. Risk Agent
-
-Analyzes:
-
-* Risk data
-* Risk scores
-* Eligibility indicators
+# Insurance API Endpoints
 
 ***
 
-## 7. Subscription Agent
+## Chatbot
 
-Handles onboarding workflows:
-
-```text
-Quote
-Application
-Verification
-Submission
-```
-
-***
-
-## 8. Document Agent
-
-Analyzes:
-
-* Policies
-* Claims
-* Uploaded documents
-
-Produces:
-
-```json
-{
-  "document_summary": "...",
-  "key_points": [...]
-}
-```
-
-***
-
-## 9. Clarification Agent
-
-Used when:
-
-```text
-Confidence < 0.6
-Missing information exists
-```
-
-Example:
-
-```text
-"What type of insurance are you interested in?"
-```
-
-***
-
-## 10. Response Agent
-
-Creates the final user-facing response.
-
-Produces:
-
-```json
-{
-  "text": "...",
-  "markdown": "...",
-  "suggestion_chips": [...]
-}
-```
-
-***
-
-## Workflow Routing
-
-```text
-START
-  │
-  ▼
-Orchestrator
-  │
-  ▼
-Intent
-  │
-  ├─► Product
-  ├─► Customer
-  ├─► Risk
-  ├─► Document
-  ├─► Subscription
-  ├─► Clarification
-  └─► Response
-```
-
-Secondary agents can route to:
-
-```text
-Recommendation
-Response
-Clarification
-```
-
-until the workflow completes.
-
-***
-
-# REST API Endpoints
-
-## Chat Endpoint
+### POST
 
 ```http
-POST /chatbot/
+/chatbot/
 ```
 
 Parameters:
 
-```json
-{
-  "user_input": "Hello",
-  "thr_id": "123",
-  "usr_id": "u001"
-}
+```text
+user_input
+thr_id
+usr_id
 ```
+
+Purpose:
+
+Main insurance assistant endpoint.
 
 ***
 
-## Recommendation Endpoint
+## Recommendation
+
+### POST
 
 ```http
-POST /recomendation/
+/recomendation/
+```
+
+Purpose:
+
+Handles recommendation workflow.
+
+***
+
+## Insurance Document
+
+### POST
+
+```http
+/generate_insurance_document/
+```
+
+Purpose:
+
+Returns stored customer information that can later be transformed into:
+
+* PDF
+* DOCX
+* Insurance Proposal
+* Recommendation Report
+
+***
+
+# Memory System
+
+The application uses two memory layers.
+
+***
+
+## Short-Term Memory
+
+Uses:
+
+```python
+InMemorySaver()
+```
+
+Purpose:
+
+Conversation history.
+
+Stored by:
+
+```python
+thread_id
 ```
 
 Example:
 
-```json
-{
-  "message": "Find me travel insurance",
-  "thr_id": "123",
-  "usr_id": "u001"
-}
+```python
+thread_123
 ```
 
 ***
 
-## Multi-Agent Endpoint
+## Long-Term Memory
 
-```http
-POST /multiagents/
+Uses:
+
+```python
+InMemoryStore()
+```
+
+Purpose:
+
+Persistent user information.
+
+Stored by:
+
+```python
+user_id
 ```
 
 Example:
 
+```python
+(user_456, "insurance_files")
+```
+
+***
+
+# Example Insurance Flow
+
+### Step 1
+
+User:
+
+```text
+I had a car accident in Tunis yesterday.
+```
+
+***
+
+### Step 2
+
+AI calls:
+
+```python
+store_insurance_file()
+```
+
+***
+
+### Step 3
+
+Data stored:
+
 ```json
 {
-  "user_input": "I need auto insurance",
-  "thr_id": "123",
-  "usr_id": "u001"
+  "incident_type": "accident",
+  "incident_location": "Tunis"
 }
 ```
 
 ***
 
-# Environment Variables
+### Step 4
 
-Create a `.env` file:
+User:
 
-```env
-AZURE_AI_INFERENCE_CREDENTIAL=YOUR_API_KEY
-AZURE_AI_INFERENCE_ENDPOINT=YOUR_ENDPOINT
-GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY
+```text
+What information is still missing?
 ```
 
 ***
 
-# Installation
+### Step 5
 
-```bash
-git clone https://github.com/your-org/insurance-ai-assistant.git
+AI calls:
 
-cd insurance-ai-assistant
-
-pip install -r requirements.txt
+```python
+retrieve_insurance_file()
 ```
 
 ***
 
-# Run the API
+### Step 6
 
-```bash
-uvicorn main:app --reload
-```
+Response:
 
-Server:
-
-```text
-http://localhost:8000
-```
-
-Swagger:
-
-```text
-http://localhost:8000/docs
+```json
+{
+  "missing_information": [
+    "policy number",
+    "claimant name",
+    "damages"
+  ]
+}
 ```
 
 ***
 
 # Future Improvements
 
-* Redis Memory Store
-* PostgreSQL Persistence
-* Vector Database Integration
-* RAG for Policy Documents
-* MCP Server Support
-* Voice Agent Integration
-* Insurance CRM Integration
-* Underwriting Agents
-* Fraud Detection Agent
-* Multi-Tenant Architecture
-* Human-in-the-Loop Approval Workflows
+This hackathon demo can easily be extended with:
+
+### Persistence
+
+* PostgreSQL
+* Redis
+* MongoDB
+
+### AI
+
+* RAG
+* Vector Databases
+* Knowledge Bases
+
+### Insurance Features
+
+* Product Recommendation Engine
+* Premium Calculation
+* Risk Scoring
+* Claim Processing
+
+### Documents
+
+* PDF Generation
+* DOCX Generation
+* Digital Signatures
+
+### Integrations
+
+* CRM
+* Insurance Core Systems
+* Payment Providers
+* Government APIs
 
 ***
 
-# Example Use Cases
+# Summary
 
-### Insurance Product Recommendation
+This application combines:
 
-```text
-User → I need family health insurance
-↓
-Intent Agent
-↓
-Product Agent
-↓
-Recommendation Agent
-↓
-Response Agent
-```
+✅ Multi-Agent AI Orchestration  
+✅ Supervisor + Specialist Pattern  
+✅ LangGraph Memory Management  
+✅ Insurance Claim Data Extraction  
+✅ Long-Term User Memory  
+✅ FastAPI APIs  
+✅ Structured Pydantic Outputs  
+✅ Recommendation Workflows  
+✅ Insurance Document Generation
 
-### Insurance Claim Creation
-
-```text
-User → My house was damaged by flooding
-↓
-fillfile()
-↓
-InsuranceFileMemory
-↓
-Claim Record
-```
-
-### Subscription Workflow
-
-```text
-User → I want auto insurance
-↓
-Intent
-↓
-Customer
-↓
-Subscription
-↓
-Recommendation
-↓
-Response
-```
-
-***
-
-# License
-
-MIT License
-
-***
-
-Built with ❤️ using **LangGraph, LangChain, FastAPI, Azure AI Foundry, Google GenAI, and Multi-Agent Architecture for Insurance Automation**.
+It is designed as a hackathon-ready foundation for building a production-grade AI insurance advisor and enterprise decision-support platform.

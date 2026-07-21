@@ -39,7 +39,7 @@ store = InMemoryStore()
 key=os.getenv("AZURE_AI_INFERENCE_CREDENTIAL")
 api= os.getenv("AZURE_AI_INFERENCE_ENDPOINT") 
 #here using azure ai foundry  for open source models
-llm = AzureAIOpenAIApiChatModel(
+gllm = AzureAIOpenAIApiChatModel(
         endpoint=api,
         credential=key,
         model="Mistral-Large-3",
